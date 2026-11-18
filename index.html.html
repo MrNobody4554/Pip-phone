@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<meta name="theme-color" content="#071407">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Pip-Boy">
+<title>PIP-BOY 3000 • Wasteland Field System</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{--g:#9cff78;--dim:#65a85a;--bg:#061006;--panel:#0b1b0c;--line:#397a31;--amber:#f0cc70;--red:#ff786c}
+*{box-sizing:border-box}html,body{margin:0;height:100%;background:#020702;color:var(--g);font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+#app{height:100dvh;max-width:1100px;margin:auto;background:radial-gradient(ellipse at center,#112811 0,#061106 75%);border:1px solid #285c25;display:flex;flex-direction:column;overflow:hidden;position:relative}
+#app:after{content:"";position:absolute;inset:0;pointer-events:none;z-index:50;background:repeating-linear-gradient(0deg,transparent 0 3px,rgba(0,0,0,.10) 4px);mix-blend-mode:multiply}
+header{padding:10px 13px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:8px}
+.brand{font-size:clamp(17px,4vw,25px);letter-spacing:3px;text-shadow:0 0 10px #69ff50}.sub{font-size:9px;color:var(--dim);letter-spacing:1px;margin-top:4px}.status{text-align:right;font-size:10px;color:var(--amber);line-height:1.6}
+nav{display:flex;overflow-x:auto;background:#071307;border-bottom:1px solid var(--line);scrollbar-width:none}
+nav button{flex:1;min-width:66px;border:0;border-right:1px solid #214b20;background:transparent;color:var(--dim);padding:12px 5px;font: bold 10px inherit;letter-spacing:.5px}
+nav button.active{color:var(--g);background:#173117;box-shadow:inset 0 -3px var(--g)}
+main{flex:1;min-height:0;overflow:auto;padding:10px}
+.panel{border:1px solid var(--line);background:rgba(4,17,5,.82);padding:11px;margin-bottom:10px;box-shadow:0 0 12px #102c10}
+h2{font-size:13px;letter-spacing:2px;margin:0 0 9px}h3{font-size:12px;margin:0 0 6px}
+.muted{color:var(--dim);font-size:10px;line-height:1.5}.notice{color:var(--amber);font-size:10px;line-height:1.5;margin-top:8px}
+#map{height:43vh;min-height:260px;border:1px solid var(--line);filter:sepia(1) hue-rotate(55deg) saturate(1.8) contrast(1.1)}
+.leaflet-container{background:#081508}.leaflet-control-attribution{font-size:8px!important}
+.actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}
+button.action,.primary{background:#102510;border:1px solid var(--g);color:var(--g);padding:10px 12px;font:inherit;font-size:11px;min-height:40px}
+button.action:active,.primary:active{background:var(--g);color:#061006}
+button:disabled{opacity:.4}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:8px}
+.stat{border:1px solid #285c25;padding:9px;background:#071407;min-width:0}.stat small{display:block;color:var(--dim);font-size:9px;margin-bottom:4px}.stat strong{font-size:12px;overflow-wrap:anywhere}
+.rowitem{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 0;border-bottom:1px dashed #285c25;font-size:11px}.rowitem:last-child{border:0}
+input,textarea,select{width:100%;background:#061006;border:1px solid var(--line);color:var(--g);padding:10px;font:inherit;font-size:12px;border-radius:0;margin:5px 0 9px}
+textarea{min-height:65px;resize:vertical}label{font-size:10px;color:var(--dim)}
+.item{border:1px solid #285c25;background:#071407;padding:10px;margin:7px 0}.itemtop{display:flex;justify-content:space-between;gap:8px;align-items:center}.tag{font-size:9px;color:var(--amber);border:1px solid #8d753d;padding:3px 5px}
+.item button{margin-top:7px}.item.unlocked{border-color:var(--g);box-shadow:0 0 8px #234d20}
+audio{width:100%;margin-top:10px;filter:sepia(1) hue-rotate(55deg) saturate(1.5)}
+footer{border-top:1px solid var(--line);padding:7px 10px;display:flex;justify-content:space-between;font-size:9px;color:var(--dim);letter-spacing:.5px}
+.hidden{display:none!important}
+@media(min-width:760px){main{padding:16px}.maplayout{display:grid;grid-template-columns:1.5fr 1fr;gap:10px}.maplayout .panel{margin:0}.maplayout #map{height:58vh}}
+</style>
+</head>
+<body>
+<div id="app">
+<header><div><div class="brand">▣ PIP-BOY 3000</div><div class="sub">VAULT-TEC PERSONAL FIELD SYSTEM</div></div><div class="status"><b>● SYSTEM ONLINE</b><br><span id="clock">--:--:--</span><br><span id="gpsState">GPS STANDBY</span></div></header>
+<nav>
+<button class="active" data-tab="map">MAP</button><button data-tab="discover">DISCOVER</button><button data-tab="quests">QUESTS</button><button data-tab="radio">RADIO</button><button data-tab="status">STATUS</button>
+</nav>
+<main>
+<section id="tab-map">
+<div class="maplayout">
+<div class="panel"><h2>LOCAL AREA MAP</h2><div id="map"></div><div class="actions"><button class="action" id="locate">◎ LOCATE ME</button><button class="action" id="track" disabled>▶ START TRACKING</button><button class="action" id="scan">⌕ SCAN NEARBY</button></div><p class="notice" id="mapMessage">Tap LOCATE ME and allow Safari location access. Nearby places can then be scanned and discovered as you walk.</p></div>
+<div class="panel"><h2>POSITION / EXPLORATION</h2><div class="grid"><div class="stat"><small>LATITUDE</small><strong id="lat">--</strong></div><div class="stat"><small>LONGITUDE</small><strong id="lon">--</strong></div><div class="stat"><small>GPS ACCURACY</small><strong id="accuracy">--</strong></div><div class="stat"><small>DISCOVERED</small><strong id="discoveredCount">0</strong></div></div><div class="rowitem"><span>TRACKING</span><b id="trackingState">OFF</b></div><div class="rowitem"><span>QUESTS ACTIVE</span><b id="activeCount">0</b></div><p class="muted">Your GPS position is used in this browser to find nearby places. Discovered places and quests are saved locally on this device.</p></div>
+</div>
+<div class="panel"><h2>SELECTED LOCATION</h2><div id="selectedPlace" class="muted">No location selected. Scan nearby places or tap a map marker.</div><div class="actions"><button class="action" id="directions" disabled>➤ GET DIRECTIONS</button></div></div>
+</section>
+<section id="tab-discover" class="hidden">
+<div class="panel"><h2>WASTELAND EXPLORATION</h2><p class="muted">Scan to find public places around your current GPS position. Walk within 75 metres of a marker to unlock it. Discovery distance is approximate and depends on GPS accuracy.</p><div class="actions"><button class="action" id="scan2">⌕ SCAN MY AREA</button></div><div id="placeList" class="muted">No scan yet.</div></div>
+</section>
+<section id="tab-quests" class="hidden">
+<div class="panel"><h2>QUEST TERMINAL</h2><p class="muted">Create your own objectives. Quests are saved on this device.</p>
+<label for="questTitle">QUEST TITLE</label><input id="questTitle" maxlength="70" placeholder="e.g. Find supplies at the marina">
+<label for="questDesc">OBJECTIVE / NOTES</label><textarea id="questDesc" maxlength="400" placeholder="What do you need to do?"></textarea>
+<button class="action" id="addQuest">＋ CREATE QUEST</button><div id="questList"></div>
+</div></section>
+<section id="tab-radio" class="hidden">
+<div class="panel"><h2>WASTELAND RADIO</h2><p class="muted">Select a station. Internet access is required for streaming.</p>
+<div class="item"><div class="itemtop"><div><b>DIAMOND CITY RADIO</b><div class="muted">FALLOUT 4</div></div><span class="tag">FO4</span></div><button class="action station" data-station="dcr">▶ TUNE IN</button></div>
+<div class="item"><div class="itemtop"><div><b>RADIO NEW VEGAS</b><div class="muted">FALLOUT: NEW VEGAS</div></div><span class="tag">FNV</span></div><button class="action station" data-station="rnv">▶ TUNE IN</button></div>
+<div class="item"><div class="itemtop"><div><b>FALLOUT CLASSICAL</b><div class="muted">FALLOUT 4 • CLASSICAL</div></div><span class="tag">FO4</span></div><button class="action station" data-station="classical">▶ TUNE IN</button></div>
+<audio id="audio" controls playsinline preload="none"></audio><p id="radioStatus" class="notice">RADIO STANDBY • Tap a station, then use the audio controls if playback does not start automatically.</p>
+</div></section>
+<section id="tab-status" class="hidden">
+<div class="panel"><h2>VAULT DWELLER STATUS</h2><div class="grid"><div class="stat"><small>HEALTH</small><strong>100 / 100</strong></div><div class="stat"><small>RADIATION</small><strong>0 RAD</strong></div><div class="stat"><small>STRENGTH</small><strong>5 / 10</strong></div><div class="stat"><small>PERCEPTION</small><strong>6 / 10</strong></div><div class="stat"><small>ENDURANCE</small><strong>5 / 10</strong></div><div class="stat"><small>CHARISMA</small><strong>5 / 10</strong></div><div class="stat"><small>INTELLIGENCE</small><strong>7 / 10</strong></div><div class="stat"><small>AGILITY</small><strong>6 / 10</strong></div><div class="stat"><small>LUCK</small><strong>5 / 10</strong></div></div></div>
+<div class="panel"><h2>FIELD SYSTEM NOTES</h2><p class="muted">Fan-made Fallout-inspired app. Location discovery uses public OpenStreetMap place data. Directions open a route in your map service. This app does not continuously run GPS in the background; keep it open while exploring.</p><button class="action" id="resetData">RESET QUESTS & DISCOVERIES</button></div>
+</section>
+</main>
+<footer><span>VAULT-TEC FIELD SYSTEMS</span><span id="footerState">READY</span><span>BUILD 2.0</span></footer>
+</div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+(()=> {
+'use strict';
+const $=id=>document.getElementById(id);
+const STORE='pipboy_v2_data';
+let state={quests:[],discovered:[],places:[]};
+try{state={...state,...JSON.parse(localStorage.getItem(STORE)||'{}')}}catch(e){}
+const save=()=>{try{localStorage.setItem(STORE,JSON.stringify(state))}catch(e){};updateCounts()};
+function updateCounts(){
+ $('discoveredCount').textContent=state.discovered.length;
+ $('activeCount').textContent=state.quests.filter(q=>!q.done).length;
+}
+let map=null,userMarker=null,accuracyCircle=null,watchId=null,lastPos=null,selected=null,placeMarkers={};
+const discoveryRadius=75;
+function msg(t){$('mapMessage').textContent=t}
+function setTab(tab){
+ document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));
+ ['map','discover','quests','radio','status'].forEach(t=>$('tab-'+t).classList.toggle('hidden',t!==tab));
+ if(tab==='map'&&map)setTimeout(()=>map.invalidateSize(),100);
+}
+document.querySelectorAll('nav button').forEach(b=>b.addEventListener('click',()=>setTab(b.dataset.tab)));
+function initMap(){
+ if(!window.L){msg('Map library could not load. Check internet access and reload.');return}
+ map=L.map('map').setView([27.8006,-97.3964],13);
+ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap contributors'}).addTo(map);
+ userMarker=L.circleMarker([27.8006,-97.3964],{radius:7,color:'#9cff78',fillColor:'#9cff78',fillOpacity:1}).addTo(map).bindPopup('Approximate starting area');
+ Object.values(state.places).forEach(addPlaceMarker);
+}
+function haversine(a,b){
+ const R=6371000,rad=x=>x*Math.PI/180,dLat=rad(b.lat-a.lat),dLon=rad(b.lon-a.lon);
+ const x=Math.sin(dLat/2)**2+Math.cos(rad(a.lat))*Math.cos(rad(b.lat))*Math.sin(dLon/2)**2;
+ return 2*R*Math.atan2(Math.sqrt(x),Math.sqrt(1-x));
+}
+function onPosition(pos){
+ lastPos={lat:pos.coords.latitude,lon:pos.coords.longitude,accuracy:pos.coords.accuracy};
+ $('lat').textContent=lastPos.lat.toFixed(6);$('lon').textContent=lastPos.lon.toFixed(6);
+ $('accuracy').textContent=Math.round(lastPos.accuracy)+' m';$('gpsState').textContent='GPS FIX ACQUIRED';
+ if(map){userMarker.setLatLng([lastPos.lat,lastPos.lon]);if(!accuracyCircle)accuracyCircle=L.circle([lastPos.lat,lastPos.lon],{radius:lastPos.accuracy,color:'#9cff78',weight:1,fillOpacity:.06}).addTo(map);else accuracyCircle.setLatLng([lastPos.lat,lastPos.lon]).setRadius(lastPos.accuracy)}
+ $('track').disabled=false;$('track').textContent=watchId===null?'▶ START TRACKING':'■ STOP TRACKING';
+ $('trackingState').textContent=watchId===null?'FIX READY':'ACTIVE';$('footerState').textContent='GPS FIX';
+ checkDiscoveries();updateSelectedDistance();
+}
+function geoError(err){
+ const t={1:'Location permission denied. Enable Location Services for Safari in iPad Settings, then reload.',2:'Location unavailable. Try outdoors and check Location Services.',3:'GPS timed out. Tap LOCATE ME again.'};
+ msg(t[err.code]||'Could not get GPS position.');$('gpsState').textContent='GPS ERROR';
+}
+function locate(){
+ if(!navigator.geolocation){msg('This browser does not support GPS.');return}
+ if(!window.isSecureContext){msg('GPS requires HTTPS. Open the deployed app website in Safari, not a local file.');return}
+ $('gpsState').textContent='REQUESTING GPS…';msg('Waiting for location permission and GPS fix…');
+ navigator.geolocation.getCurrentPosition(onPosition,geoError,{enableHighAccuracy:true,timeout:25000,maximumAge:0});
+}
+$('locate').addEventListener('click',locate);
+$('track').addEventListener('click',()=>{
+ if(watchId!==null){navigator.geolocation.clearWatch(watchId);watchId=null;$('track').textContent='▶ START TRACKING';$('trackingState').textContent='OFF';msg('Tracking stopped.');return}
+ if(!lastPos){locate();msg('First acquire your location, then tap START TRACKING.');return}
+ watchId=navigator.geolocation.watchPosition(onPosition,geoError,{enableHighAccuracy:true,maximumAge:2000,timeout:25000});
+ $('track').textContent='■ STOP TRACKING';$('trackingState').textContent='ACTIVE';msg('Live tracking active while this page stays open.');
+});
+function addPlaceMarker(place){
+ if(!map||placeMarkers[place.id])return;
+ const unlocked=state.discovered.includes(place.id);
+ const m=L.marker([place.lat,place.lon]).addTo(map);
+ m.bindPopup((unlocked?'UNLOCKED • ':'UNDISCOVERED • ')+escapeHtml(place.name));
+ m.on('click',()=>selectPlace(place.id));
+ placeMarkers[place.id]=m;
+}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+async function scan(){
+ if(!lastPos){msg('Tap LOCATE ME first so I can scan around you.');return}
+ msg('Scanning nearby public places…');$('footerState').textContent='SCANNING';
+ const {lat,lon}=lastPos;
+ const query=`[out:json][timeout:20];(node(around:1800,${lat},${lon})[name];way(around:1800,${lat},${lon})[name];relation(around:1800,${lat},${lon})[name];);out center tags;`;
+ try{
+  const response=await fetch('https://overpass-api.de/api/interpreter',{method:'POST',headers:{'Content-Type':'text/plain;charset=UTF-8'},body:query});
+  if(!response.ok)throw new Error('Nearby place service is busy. Try scanning again in a minute.');
+  const data=await response.json();
+  const found=[];
+  for(const el of data.elements||[]){
+   const tags=el.tags||{},name=tags.name;if(!name)continue;
+   const plat=el.lat??el.center?.lat,plon=el.lon??el.center?.lon;if(!Number.isFinite(plat)||!Number.isFinite(plon))continue;
+   const id=String(el.type)+'-'+el.id;
+   const place={id,name,lat:plat,lon:plon,kind:tags.amenity||tags.shop||tags.tourism||tags.leisure||tags.historic||tags.place||'location'};
+   state.places[id]=place;found.push(place);
+  }
+  save();found.forEach(addPlaceMarker);renderPlaces();
+  msg(`Scan complete. ${found.length} named places found within about 1.8 km. Walk within ${discoveryRadius} m to unlock them.`);
+  $('footerState').textContent='SCAN COMPLETE';checkDiscoveries();
+ }catch(e){msg(e.message||'Could not scan nearby places. Check your internet connection and try again.');$('footerState').textContent='SCAN ERROR'}
+}
+$('scan').addEventListener('click',scan);$('scan2').addEventListener('click',scan);
+function checkDiscoveries(){
+ if(!lastPos)return;
+ let changed=false;
+ Object.values(state.places).forEach(p=>{
+  if(!state.discovered.includes(p.id)&&haversine(lastPos,{lat:p.lat,lon:p.lon})<=discoveryRadius){
+   state.discovered.push(p.id);changed=true;
+   const m=placeMarkers[p.id];if(m)m.setPopupContent('UNLOCKED • '+escapeHtml(p.name));
+  }
+ });
+ if(changed){save();renderPlaces();msg('NEW LOCATION DISCOVERED! Check the DISCOVER tab.')}
+}
+function renderPlaces(){
+ const list=$('placeList');const places=Object.values(state.places).sort((a,b)=>haversine(lastPos||{lat:a.lat,lon:a.lon},{lat:a.lat,lon:a.lon})-haversine(lastPos||{lat:b.lat,lon:b.lon},{lat:b.lat,lon:b.lon}));
+ if(!places.length){list.textContent='No places loaded. Tap SCAN MY AREA.';return}
+ list.innerHTML='';
+ places.forEach(p=>{
+  const unlocked=state.discovered.includes(p.id),dist=lastPos?Math.round(haversine(lastPos,{lat:p.lat,lon:p.lon}))+' m away':'distance unknown';
+  const div=document.createElement('div');div.className='item'+(unlocked?' unlocked':'');
+  const top=document.createElement('div');top.className='itemtop';
+  const title=document.createElement('b');title.textContent=p.name;
+  const tag=document.createElement('span');tag.className='tag';tag.textContent=unlocked?'UNLOCKED':'LOCKED';
+  top.append(title,tag);const detail=document.createElement('div');detail.className='muted';detail.textContent=p.kind+' • '+dist;
+  const btn=document.createElement('button');btn.className='action';btn.textContent=unlocked?'VIEW / DIRECTIONS':'◎ WALK CLOSER';btn.disabled=!unlocked;btn.addEventListener('click',()=>{selectPlace(p.id);setTab('map')});
+  div.append(top,detail,btn);list.append(div);
+ });
+}
+function selectPlace(id){
+ const p=state.places[id];if(!p)return;selected=p;
+ const unlocked=state.discovered.includes(id),dist=lastPos?Math.round(haversine(lastPos,{lat:p.lat,lon:p.lon}))+' metres away':'GPS not acquired';
+ $('selectedPlace').textContent=p.name+' • '+(unlocked?'DISCOVERED':'NOT YET DISCOVERED')+' • '+dist;
+ $('directions').disabled=!unlocked;
+ if(map)map.setView([p.lat,p.lon],16);
+}
+function updateSelectedDistance(){if(selected)selectPlace(selected.id)}
+$('directions').addEventListener('click',()=>{
+ if(!selected||!state.discovered.includes(selected.id))return;
+ const url=`https://www.google.com/maps/dir/?api=1&destination=${selected.lat},${selected.lon}&travelmode=walking`;
+ window.open(url,'_blank');
+});
+function renderQuests(){
+ const list=$('questList');list.innerHTML='';
+ if(!state.quests.length){list.innerHTML='<p class="muted">NO QUESTS CREATED.</p>';return}
+ state.quests.forEach(q=>{
+  const div=document.createElement('div');div.className='item';
+  const top=document.createElement('div');top.className='itemtop';
+  const title=document.createElement('b');title.textContent=q.title;
+  const tag=document.createElement('span');tag.className='tag';tag.textContent=q.done?'COMPLETED':'ACTIVE';top.append(title,tag);
+  const desc=document.createElement('p');desc.className='muted';desc.textContent=q.desc||'No additional notes.';
+  const toggle=document.createElement('button');toggle.className='action';toggle.textContent=q.done?'↶ REOPEN':'✓ COMPLETE';toggle.addEventListener('click',()=>{q.done=!q.done;save();renderQuests()});
+  const del=document.createElement('button');del.className='action';del.textContent='DELETE';del.addEventListener('click',()=>{state.quests=state.quests.filter(x=>x.id!==q.id);save();renderQuests()});
+  div.append(top,desc,toggle,del);list.append(div);
+ });
+}
+$('addQuest').addEventListener('click',()=>{
+ const title=$('questTitle').value.trim(),desc=$('questDesc').value.trim();
+ if(!title){$('questTitle').focus();return}
+ state.quests.unshift({id:Date.now().toString(),title,desc,done:false,created:new Date().toISOString()});
+ $('questTitle').value='';$('questDesc').value='';save();renderQuests();
+});
+const streams={dcr:'https://fallout.fm:8444/falloutfm6.ogg',rnv:'https://fallout.fm:8444/falloutfm3.ogg',classical:'https://fallout.fm:8444/falloutfm7.ogg'};
+document.querySelectorAll('.station').forEach(btn=>btn.addEventListener('click',async()=>{
+ const audio=$('audio');audio.src=streams[btn.dataset.station];$('radioStatus').textContent='CONNECTING…';
+ try{await audio.play();$('radioStatus').textContent='STREAM PLAYING • '+btn.parentElement.querySelector('b').textContent}
+ catch(e){$('radioStatus').textContent='Stream selected. Press PLAY in the audio controls below. If it fails, the station may be temporarily unavailable.'}
+}));
+$('resetData').addEventListener('click',()=>{
+ if(!confirm('Delete all saved quests and discovered locations from this device?'))return;
+ state={quests:[],discovered:[],places:[]};save();Object.values(placeMarkers).forEach(m=>map&&map.removeLayer(m));placeMarkers={};selected=null;$('selectedPlace').textContent='No location selected.';$('directions').disabled=true;renderPlaces();renderQuests();
+});
+function tick(){$('clock').textContent=new Date().toLocaleTimeString()}tick();setInterval(tick,1000);
+updateCounts();renderQuests();renderPlaces();initMap();
+})();
+</script>
+</body>
+</html>
